@@ -1,0 +1,98 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body {
+  height: 100%;
+  background: #0a0a0a;
+  color: #ffffff;
+  image-rendering: pixelated;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button {
+  font-family: inherit;
+}
+
+@layer components {
+  .ut-frame {
+    @apply border-4 border-white bg-black p-4;
+    box-shadow: 0 0 0 4px #000, 0 0 0 8px #fff inset;
+  }
+
+  .ut-box {
+    @apply border-[6px] border-white bg-black;
+  }
+
+  .ut-btn {
+    @apply font-pixel text-[10px] uppercase tracking-wider px-3 py-2
+           border-2 border-white text-white bg-black
+           hover:bg-white hover:text-black transition-colors
+           focus:outline-none focus:ring-2 focus:ring-ut-act
+           disabled:opacity-30 disabled:cursor-not-allowed;
+  }
+
+  .ut-btn-active {
+    @apply bg-white text-black;
+  }
+
+  .ut-dialog {
+    @apply font-dialog text-2xl leading-tight text-white;
+  }
+
+  .ut-label {
+    @apply font-pixel text-[10px] uppercase tracking-[0.2em] text-white;
+  }
+
+  .ut-pixel-text {
+    @apply font-pixel text-[10px] leading-relaxed;
+  }
+
+  .scanlines::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.18) 3px,
+      rgba(0, 0, 0, 0) 4px
+    );
+    pointer-events: none;
+    mix-blend-mode: multiply;
+  }
+}
+
+.soul {
+  width: 16px;
+  height: 16px;
+  background: #ff0000;
+  clip-path: polygon(
+    50% 100%,
+    100% 60%,
+    100% 30%,
+    75% 10%,
+    50% 25%,
+    25% 10%,
+    0 30%,
+    0 60%
+  );
+}
+
+.soul-lg {
+  width: 22px;
+  height: 22px;
+}
+
+.hp-fill {
+  background: #ffe600;
+  box-shadow: 0 0 0 2px #000 inset;
+}
+
+.hp-track {
+  background: #ff2b2b;
+  box-shadow: 0 0 0 2px #000 inset;
+}
