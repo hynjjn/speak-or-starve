@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
   text: string;
@@ -12,6 +12,11 @@ type Props = {
 export default function Typewriter({ text, speedMs = 28, className, onDone }: Props) {
   const [shown, setShown] = useState("");
   const [done, setDone] = useState(false);
+  const onDoneRef = useRef(onDone);
+
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
 
   useEffect(() => {
     setShown("");
@@ -23,11 +28,11 @@ export default function Typewriter({ text, speedMs = 28, className, onDone }: Pr
       if (i >= text.length) {
         window.clearInterval(id);
         setDone(true);
-        onDone?.();
+        onDoneRef.current?.();
       }
     }, speedMs);
     return () => window.clearInterval(id);
-  }, [text, speedMs, onDone]);
+  }, [text, speedMs]);
 
   return (
     <span className={className}>
