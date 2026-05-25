@@ -1,17 +1,21 @@
 "use client";
 
-import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import HUD from "./HUD";
 import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { useGame } from "@/lib/game-state";
 import { ITEMS, STAGES } from "@/lib/stages";
-import { gradeUtteranceAsync, type GradeResult } from "@/lib/speech-api";
+import {
+  gradeFromUtterances,
+  type GradeResult,
+  type Utterance,
+  type WordBreakdown,
+} from "@/lib/speech-api";
 
 type Phase =
   | "intro" // watch + inner voice
   | "menu" // soul navigates FIGHT/ACT/ITEM/MERCY
-  | "speak" // speaking mission active
-  | "judging" // awaiting grade
+  | "speak" // speaking mission active (mic open)
   | "result" // grade returned
   | "victory";
 
@@ -27,12 +31,9 @@ export default function Encounter() {
   const [introDone, setIntroDone] = useState(false);
   const [menuIdx, setMenuIdx] = useState(0);
   const [missionIdx, setMissionIdx] = useState(0);
-  const [transcript, setTranscript] = useState("");
-  const [timeLeft, setTimeLeft] = useState(0);
   const [grade, setGrade] = useState<GradeResult | null>(null);
   const [shake, setShake] = useState(false);
   const [resultLineDone, setResultLineDone] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const introTw = useRef<TypewriterHandle>(null);
   const resultTw = useRef<TypewriterHandle>(null);
 
@@ -84,26 +85,6 @@ export default function Encounter() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // Speak countdown
-  useEffect(() => {
-    if (phase !== "speak" || !mission) return;
-    setTimeLeft(mission.timeLimitMs);
-    setTranscript("");
-    inputRef.current?.focus();
-    const start = performance.now();
-    const id = window.setInterval(() => {
-      const left = Math.max(0, mission.timeLimitMs - (performance.now() - start));
-      setTimeLeft(left);
-      if (left <= 0) {
-        window.clearInterval(id);
-        // grade what we have (possibly empty)
-        finalize();
-      }
-    }, 100);
-    return () => window.clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, mission]);
-
   if (!stage) return null;
 
   function choose(opt: MenuOpt) {
@@ -141,18 +122,18 @@ export default function Encounter() {
     }
   }
 
-  async function finalize() {
-    setPhase("judging");
-    const m = stage!.missions[missionIdx];
-    const result = await gradeUtteranceAsync(transcript, m.target);
-    setGrade(result);
-    if (!result.passed) {
-      setShake(true);
-      damage(stage!.damageOnFail);
-      setTimeout(() => setShake(false), 400);
-    }
-    setPhase("result");
-  }
+  const handleSpeakResult = useCallback(
+    (result: GradeResult) => {
+      setGrade(result);
+      if (!result.passed) {
+        setShake(true);
+        damage(stage!.damageOnFail);
+        setTimeout(() => setShake(false), 400);
+      }
+      setPhase("result");
+    },
+    [damage, stage],
+  );
 
   function continueAfterResult() {
     if (!grade) return;
@@ -221,9 +202,9 @@ export default function Encounter() {
           </p>
         </div>
 
-        {phase === "judging" && (
+        {phase === "speak" && (
           <div className="absolute bottom-4 ut-pixel-text text-ut-act animate-flash">
-            ... LISTENING ...
+            ... SPEAK NOW ...
           </div>
         )}
       </div>
@@ -257,24 +238,23 @@ export default function Encounter() {
         {phase === "speak" && (
           <SpeakPanel
             mission={mission!}
-            transcript={transcript}
-            setTranscript={setTranscript}
-            timeLeft={timeLeft}
-            inputRef={inputRef}
-            onSubmit={() => finalize()}
+            onResult={handleSpeakResult}
             onCancel={() => setPhase("menu")}
           />
         )}
 
-        {(phase === "result" || phase === "judging") && grade && (
-          <DialogPanel
-            ref={resultTw}
-            line={grade.message + (grade.score ? ` (score ${(grade.score * 100).toFixed(0)})` : "")}
-            onDone={() => setResultLineDone(true)}
-            footer={resultLineDone ? "[Z / CLICK] CONTINUE" : "[Z / CLICK] SKIP"}
-            arrowReady={resultLineDone}
-            onAdvance={phase === "result" ? advanceResult : undefined}
-          />
+        {phase === "result" && grade && (
+          <div className="flex flex-col gap-3">
+            <DialogPanel
+              ref={resultTw}
+              line={grade.message + (grade.score ? ` (score ${(grade.score * 100).toFixed(0)})` : "")}
+              onDone={() => setResultLineDone(true)}
+              footer={resultLineDone ? "[Z / CLICK] CONTINUE" : "[Z / CLICK] SKIP"}
+              arrowReady={resultLineDone}
+              onAdvance={advanceResult}
+            />
+            {grade.detail && <ResultDetail detail={grade.detail} />}
+          </div>
         )}
 
         {phase === "victory" && (
@@ -407,69 +387,431 @@ function MenuPanel({
   );
 }
 
+const SILENCE_MS = 4000;
+
 function SpeakPanel({
   mission,
-  transcript,
-  setTranscript,
-  timeLeft,
-  inputRef,
-  onSubmit,
+  onResult,
   onCancel,
 }: {
   mission: { prompt: string; target: string; hint: string; timeLimitMs: number };
-  transcript: string;
-  setTranscript: (s: string) => void;
-  timeLeft: number;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onSubmit: () => void;
+  onResult: (grade: GradeResult) => void;
   onCancel: () => void;
 }) {
-  const pct = Math.max(0, Math.min(100, (timeLeft / mission.timeLimitMs) * 100));
+  const [listening, setListening] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [livePartial, setLivePartial] = useState("");
+  const [recognized, setRecognized] = useState("");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognizerRef = useRef<any>(null);
+  const utterancesRef = useRef<Utterance[]>([]);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const finalizedRef = useRef(false);
+
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current !== null) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+  }, []);
+
+  const finalize = useCallback(() => {
+    if (finalizedRef.current) return;
+    finalizedRef.current = true;
+    onResult(gradeFromUtterances(utterancesRef.current));
+  }, [onResult]);
+
+  const referenceWordCount = useCallback(
+    () => mission.target.trim().split(/\s+/).filter(Boolean).length,
+    [mission.target],
+  );
+
+  const countSpokenWords = useCallback(() => {
+    let count = 0;
+    for (const { nbest } of utterancesRef.current) {
+      const ws = Array.isArray(nbest?.Words) ? nbest.Words : [];
+      for (const w of ws) {
+        const err = w?.PronunciationAssessment?.ErrorType;
+        if (err && err !== "Omission" && err !== "Insertion") count++;
+      }
+    }
+    return count;
+  }, []);
+
+  const handleStop = useCallback(() => {
+    const reco = recognizerRef.current;
+    if (!reco) return;
+    clearSilenceTimer();
+    setListening(false);
+    setBusy(true);
+    reco.stopContinuousRecognitionAsync(
+      () => {
+        // sessionStopped will close + finalize
+      },
+      (err: unknown) => {
+        setError(`Failed to stop: ${String(err)}`);
+        try {
+          reco.close();
+        } catch {
+          // ignore
+        }
+        recognizerRef.current = null;
+        setBusy(false);
+      },
+    );
+  }, [clearSilenceTimer]);
+
+  const handleStart = useCallback(async () => {
+    setError(null);
+    setLivePartial("");
+    setRecognized("");
+    setBusy(true);
+    utterancesRef.current = [];
+    finalizedRef.current = false;
+    clearSilenceTimer();
+
+    try {
+      const tokenRes = await fetch("/api/speech/token");
+      if (!tokenRes.ok) {
+        const detail = await tokenRes.json().catch(() => ({}));
+        throw new Error(
+          detail?.error || `Token endpoint returned ${tokenRes.status}`,
+        );
+      }
+      const { token, region } = (await tokenRes.json()) as {
+        token: string;
+        region: string;
+      };
+
+      const SDK = await import("microsoft-cognitiveservices-speech-sdk");
+      const {
+        SpeechConfig,
+        AudioConfig,
+        SpeechRecognizer,
+        PronunciationAssessmentConfig,
+        PronunciationAssessmentGradingSystem,
+        PronunciationAssessmentGranularity,
+        PropertyId,
+        ResultReason,
+        CancellationReason,
+      } = SDK;
+
+      const speechConfig = SpeechConfig.fromAuthorizationToken(token, region);
+      speechConfig.speechRecognitionLanguage = "en-US";
+
+      const audioConfig = AudioConfig.fromDefaultMicrophoneInput();
+      const reco = new SpeechRecognizer(speechConfig, audioConfig);
+
+      const paConfig = new PronunciationAssessmentConfig(
+        mission.target,
+        PronunciationAssessmentGradingSystem.HundredMark,
+        PronunciationAssessmentGranularity.Phoneme,
+        true,
+      );
+      paConfig.enableProsodyAssessment = true;
+      paConfig.applyTo(reco);
+
+      const armSilenceTimer = () => {
+        clearSilenceTimer();
+        silenceTimerRef.current = setTimeout(() => {
+          silenceTimerRef.current = null;
+          handleStop();
+        }, SILENCE_MS);
+      };
+
+      reco.recognizing = (
+        _s: unknown,
+        e: { result: { text?: string } },
+      ) => {
+        setLivePartial(e.result.text ?? "");
+        armSilenceTimer();
+      };
+
+      reco.recognized = (
+        _s: unknown,
+        e: {
+          result: {
+            reason: number;
+            text?: string;
+            properties: { getProperty: (p: number) => string };
+          };
+        },
+      ) => {
+        setLivePartial("");
+        if (e.result.reason !== ResultReason.RecognizedSpeech) {
+          armSilenceTimer();
+          return;
+        }
+        const raw = e.result.properties.getProperty(
+          PropertyId.SpeechServiceResponse_JsonResult,
+        );
+        if (!raw) return;
+        try {
+          const parsed = JSON.parse(raw);
+          const nbest = parsed?.NBest?.[0];
+          if (!nbest) return;
+          utterancesRef.current.push({
+            text: e.result.text ?? nbest.Display ?? "",
+            nbest,
+          });
+          setRecognized(
+            utterancesRef.current
+              .map((u) => u.text)
+              .join(" ")
+              .trim(),
+          );
+          const refCount = referenceWordCount();
+          if (refCount > 0 && countSpokenWords() >= refCount) {
+            clearSilenceTimer();
+            handleStop();
+          } else {
+            armSilenceTimer();
+          }
+        } catch {
+          armSilenceTimer();
+        }
+      };
+
+      reco.canceled = (
+        _s: unknown,
+        e: { reason: number; errorDetails?: string },
+      ) => {
+        clearSilenceTimer();
+        if (e.reason === CancellationReason.Error) {
+          setError(`Recognition canceled: ${e.errorDetails ?? "unknown error"}`);
+        }
+        try {
+          reco.close();
+        } catch {
+          // ignore
+        }
+        recognizerRef.current = null;
+        setListening(false);
+        setBusy(false);
+      };
+
+      reco.sessionStopped = () => {
+        clearSilenceTimer();
+        setLivePartial("");
+        try {
+          reco.close();
+        } catch {
+          // ignore
+        }
+        recognizerRef.current = null;
+        setListening(false);
+        setBusy(false);
+        finalize();
+      };
+
+      recognizerRef.current = reco;
+
+      await new Promise<void>((resolve, reject) => {
+        reco.startContinuousRecognitionAsync(
+          () => resolve(),
+          (err: unknown) =>
+            reject(new Error(typeof err === "string" ? err : String(err))),
+        );
+      });
+
+      setListening(true);
+      setBusy(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+      if (recognizerRef.current) {
+        try {
+          recognizerRef.current.close();
+        } catch {
+          // ignore
+        }
+        recognizerRef.current = null;
+      }
+      setListening(false);
+      setBusy(false);
+    }
+  }, [
+    mission.target,
+    clearSilenceTimer,
+    countSpokenWords,
+    finalize,
+    handleStop,
+    referenceWordCount,
+  ]);
+
+  // ESC cancels (only when not actively listening)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !listening && !busy) onCancel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [listening, busy, onCancel]);
+
+  // cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearSilenceTimer();
+      if (recognizerRef.current) {
+        try {
+          recognizerRef.current.close();
+        } catch {
+          // ignore
+        }
+        recognizerRef.current = null;
+      }
+    };
+  }, [clearSilenceTimer]);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-3">
         <span className="ut-label text-ut-fight">▶ SPEAK</span>
-        <div className="relative h-2 flex-1 hp-track">
-          <div
-            className="absolute inset-y-0 left-0 hp-fill transition-all duration-100"
-            style={{ width: `${pct}%` }}
-          />
+        <div className="ml-auto flex items-center gap-2">
+          {listening && (
+            <span className="flex items-center gap-1 ut-pixel-text text-ut-dmg">
+              <span className="inline-block w-2 h-2 bg-ut-dmg animate-blink" />
+              REC
+            </span>
+          )}
+          {busy && !listening && (
+            <span className="ut-pixel-text text-ut-act animate-flash">...</span>
+          )}
         </div>
-        <span className="ut-pixel-text">{(timeLeft / 1000).toFixed(1)}s</span>
       </div>
 
       <p className="ut-pixel-text text-ut-dim">TARGET PHRASE</p>
       <p className="ut-dialog text-ut-act border-2 border-ut-act px-3 py-2">
-        “{mission.target}”
+        &ldquo;{mission.target}&rdquo;
       </p>
 
-      <p className="ut-pixel-text text-ut-dim">
-        Speak the line aloud — and type/paste your transcript:
-      </p>
-      <input
-        ref={inputRef}
-        value={transcript}
-        onChange={(e) => setTranscript(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") onSubmit();
-          if (e.key === "Escape") onCancel();
-        }}
-        autoFocus
-        placeholder="(type what you said)"
-        className="bg-black border-2 border-white text-white font-dialog text-xl px-3 py-2 outline-none focus:border-ut-act"
-      />
+      <div className="bg-black border-2 border-white min-h-[3rem] px-3 py-2">
+        <p className="font-dialog text-lg leading-tight">
+          {recognized && <span>{recognized}</span>}
+          {recognized && livePartial && " "}
+          {livePartial && <span className="opacity-60">{livePartial}</span>}
+          {!recognized && !livePartial && (
+            <span className="ut-pixel-text text-ut-dim opacity-60">
+              {listening
+                ? "(speak now...)"
+                : busy
+                  ? "(opening the watch...)"
+                  : "(press SPEAK to begin)"}
+            </span>
+          )}
+        </p>
+      </div>
+
+      {error && (
+        <p className="ut-pixel-text text-ut-dmg border-2 border-ut-dmg px-2 py-1">
+          ! {error}
+        </p>
+      )}
+
       <div className="flex items-center justify-between mt-1">
         <p className="ut-pixel-text text-ut-dim">
-          [ENTER] SUBMIT · [ESC] BACK
+          {listening ? "SILENCE ENDS THE TAKE" : "[ESC] BACK"}
         </p>
-        <button className="ut-btn" onClick={onSubmit}>
-          ▶ SUBMIT
-        </button>
+        <div className="flex gap-2">
+          {!listening && !busy && (
+            <>
+              <button
+                type="button"
+                className="ut-btn"
+                onClick={onCancel}
+              >
+                BACK
+              </button>
+              <button
+                type="button"
+                className="ut-btn border-ut-fight text-ut-fight hover:bg-ut-fight hover:text-black"
+                onClick={handleStart}
+              >
+                ▶ SPEAK
+              </button>
+            </>
+          )}
+          {listening && (
+            <button
+              type="button"
+              className="ut-btn border-ut-dmg text-ut-dmg hover:bg-ut-dmg hover:text-black"
+              onClick={handleStop}
+            >
+              ■ STOP
+            </button>
+          )}
+        </div>
       </div>
-      <p className="ut-pixel-text text-ut-dim opacity-70">
-        // TODO: connect to speech-to-text API. UI ready.
-      </p>
     </div>
+  );
+}
+
+function ResultDetail({
+  detail,
+}: {
+  detail: NonNullable<GradeResult["detail"]>;
+}) {
+  const { scores, words } = detail;
+  return (
+    <div className="flex flex-col gap-2 pl-10 pr-2">
+      <div className="flex flex-wrap gap-2">
+        <ScoreChip label="ACC" value={scores.accuracy} />
+        <ScoreChip label="FLU" value={scores.fluency} />
+        <ScoreChip label="CMP" value={scores.completeness} />
+        <ScoreChip label="PRO" value={scores.prosody} />
+        <ScoreChip label="PRN" value={scores.pronunciation} />
+      </div>
+      {words.length > 0 && (
+        <div className="flex flex-wrap gap-1 border-2 border-white bg-black/50 px-2 py-2">
+          {words.map((w, i) => (
+            <WordChip key={`${w.word}-${i}`} word={w} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ScoreChip({ label, value }: { label: string; value: number }) {
+  const v = Math.round(value);
+  const color =
+    v >= 80
+      ? "border-ut-mercy text-ut-mercy"
+      : v >= 60
+        ? "border-ut-act text-ut-act"
+        : "border-ut-dmg text-ut-dmg";
+  return (
+    <span
+      className={[
+        "ut-pixel-text border-2 px-2 py-1 bg-black",
+        color,
+      ].join(" ")}
+    >
+      {label} {v}
+    </span>
+  );
+}
+
+function WordChip({ word }: { word: WordBreakdown }) {
+  const err = word.errorType;
+  const label = word.word || "·";
+  const tip =
+    typeof word.accuracy === "number"
+      ? `${label} — ${err ?? "Unknown"} (${Math.round(word.accuracy)})`
+      : `${label} — ${err ?? "Unknown"}`;
+  const cls =
+    err === "Omission"
+      ? "text-ut-dmg line-through"
+      : err === "Insertion"
+        ? "text-ut-fight italic"
+        : err === "Mispronunciation"
+          ? "text-ut-act"
+          : "text-ut-mercy";
+  return (
+    <span title={tip} className={["font-dialog text-lg px-1", cls].join(" ")}>
+      {label}
+    </span>
   );
 }
 
