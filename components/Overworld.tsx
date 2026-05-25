@@ -5,7 +5,7 @@ import HUD from "./HUD";
 import { useGame } from "@/lib/game-state";
 import { STAGES } from "@/lib/stages";
 
-const PLAYER_STEP = 2.4;
+const PLAYER_STEP = 0.5;
 
 export default function Overworld() {
   const { state, enterStage } = useGame();
@@ -136,10 +136,21 @@ export default function Overworld() {
           const available =
             !cleared &&
             (nextStage ? s.id === nextStage.id : false);
+          const label = cleared ? "Stage cleared" : available ? `Enter ${s.title}` : "Locked";
           return (
-            <div
+            <button
+              type="button"
               key={s.id}
-              className="absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center"
+              onClick={() => {
+                if (available) enterStage(s.id);
+              }}
+              disabled={!available}
+              aria-label={label}
+              title={label}
+              className={[
+                "absolute -translate-x-1/2 -translate-y-1/2 flex flex-col items-center focus:outline-none",
+                available ? "cursor-pointer" : "cursor-not-allowed",
+              ].join(" ")}
               style={{ left: `${s.nodePosition.x}%`, top: `${s.nodePosition.y}%` }}
             >
               <div
@@ -148,7 +159,7 @@ export default function Overworld() {
                   cleared
                     ? "bg-ut-mercy text-black"
                     : available
-                      ? "bg-ut-act text-black animate-bob"
+                      ? "bg-ut-act text-black animate-bob hover:ring-2 hover:ring-white"
                       : "bg-ut-dim text-black opacity-70",
                 ].join(" ")}
               >
@@ -162,7 +173,7 @@ export default function Overworld() {
               >
                 {s.title.split("—")[1]?.trim() ?? s.title}
               </div>
-            </div>
+            </button>
           );
         })}
 
@@ -184,7 +195,7 @@ export default function Overworld() {
 
       <div className="bg-black border-t-4 border-white px-4 py-2 flex items-center justify-between">
         <p className="ut-pixel-text text-ut-dim">
-          MOVE: ARROWS / WASD &nbsp; · &nbsp; ENTER STAGE: Z / ENTER
+          MOVE: ARROWS / WASD &nbsp; · &nbsp; ENTER STAGE: Z / ENTER / CLICK NODE
         </p>
         <p className="ut-pixel-text text-ut-act">
           {state.clearedStages.length}/{STAGES.length} CLEARED
