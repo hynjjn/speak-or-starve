@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { forwardRef, useEffect, useMemo, useRef, useState } from "react";
 import HUD from "./HUD";
-import Typewriter from "./Typewriter";
+import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { useGame } from "@/lib/game-state";
 import { ITEMS, STAGES } from "@/lib/stages";
 import { gradeUtteranceAsync, type GradeResult } from "@/lib/speech-api";
@@ -33,6 +33,8 @@ export default function Encounter() {
   const [shake, setShake] = useState(false);
   const [resultLineDone, setResultLineDone] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const introTw = useRef<TypewriterHandle>(null);
+  const resultTw = useRef<TypewriterHandle>(null);
 
   const introLines = useMemo(
     () => (stage ? [stage.watchLine, stage.innerVoice] : []),
@@ -41,23 +43,30 @@ export default function Encounter() {
 
   const mission = stage?.missions[missionIdx];
 
+  function advanceIntro() {
+    if (!introDone) {
+      introTw.current?.complete();
+      return;
+    }
+    if (introIdx < introLines.length - 1) {
+      setIntroIdx((i) => i + 1);
+      setIntroDone(false);
+    } else {
+      setPhase("menu");
+    }
+  }
+
   // Intro keyboard handler
   useEffect(() => {
     if (phase !== "intro") return;
     const onKey = (e: KeyboardEvent) => {
-      if (!introDone) return;
       if (e.key === "Enter" || e.key === "z" || e.key === "Z" || e.key === " ") {
-        if (introIdx < introLines.length - 1) {
-          setIntroIdx((i) => i + 1);
-          setIntroDone(false);
-        } else {
-          setPhase("menu");
-        }
+        advanceIntro();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [phase, introDone, introIdx, introLines.length]);
+  });
 
   // Menu keyboard handler
   useEffect(() => {
@@ -164,13 +173,20 @@ export default function Encounter() {
     }
   }
 
+  function advanceResult() {
+    if (!resultLineDone) {
+      resultTw.current?.complete();
+      return;
+    }
+    continueAfterResult();
+  }
+
   // Result keyboard handler
   useEffect(() => {
     if (phase !== "result") return;
     const onKey = (e: KeyboardEvent) => {
-      if (!resultLineDone) return;
       if (e.key === "Enter" || e.key === "z" || e.key === "Z" || e.key === " ") {
-        continueAfterResult();
+        advanceResult();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -216,9 +232,12 @@ export default function Encounter() {
       <div className="bg-black border-t-4 border-white p-4 min-h-[230px]">
         {phase === "intro" && (
           <DialogPanel
+            ref={introTw}
             line={introLines[introIdx]}
             onDone={() => setIntroDone(true)}
-            footer={introDone ? "[Z] CONTINUE ▼" : ""}
+            footer={introDone ? "[Z / CLICK] CONTINUE" : "[Z / CLICK] SKIP"}
+            arrowReady={introDone}
+            onAdvance={advanceIntro}
           />
         )}
 
@@ -249,9 +268,12 @@ export default function Encounter() {
 
         {(phase === "result" || phase === "judging") && grade && (
           <DialogPanel
+            ref={resultTw}
             line={grade.message + (grade.score ? ` (score ${(grade.score * 100).toFixed(0)})` : "")}
             onDone={() => setResultLineDone(true)}
-            footer={resultLineDone ? "[Z] CONTINUE ▼" : ""}
+            footer={resultLineDone ? "[Z / CLICK] CONTINUE" : "[Z / CLICK] SKIP"}
+            arrowReady={resultLineDone}
+            onAdvance={phase === "result" ? advanceResult : undefined}
           />
         )}
 
@@ -283,27 +305,49 @@ export default function Encounter() {
 
 /* -- subcomponents ------------------------------------------------------- */
 
-function DialogPanel({
-  line,
-  onDone,
-  footer,
-}: {
-  line: string;
-  onDone?: () => void;
-  footer?: string;
-}) {
+const DialogPanel = forwardRef<
+  TypewriterHandle,
+  {
+    line: string;
+    onDone?: () => void;
+    footer?: string;
+    onAdvance?: () => void;
+    arrowReady?: boolean;
+  }
+>(function DialogPanel({ line, onDone, footer, onAdvance, arrowReady }, ref) {
+  const Wrapper: React.ElementType = onAdvance ? "button" : "div";
+  const wrapperProps = onAdvance
+    ? {
+        type: "button" as const,
+        onClick: onAdvance,
+        "aria-label": arrowReady ? "Continue" : "Skip to end of line",
+        className:
+          "relative w-full flex items-start gap-4 text-left cursor-pointer hover:bg-white/5 focus:outline-none focus:bg-white/5 transition-colors",
+      }
+    : { className: "relative flex items-start gap-4" };
   return (
-    <div className="relative flex items-start gap-4">
+    <Wrapper {...wrapperProps}>
       <div className="soul soul-lg mt-2 animate-bob" />
-      <div className="flex-1">
-        <Typewriter text={line} className="ut-dialog" onDone={onDone} />
+      <div className="flex-1 pr-10">
+        <Typewriter ref={ref} text={line} className="ut-dialog" onDone={onDone} />
         {footer && (
           <p className="mt-3 ut-pixel-text text-ut-dim animate-blink">{footer}</p>
         )}
       </div>
-    </div>
+      {onAdvance && (
+        <span
+          className={[
+            "absolute bottom-0 right-2 font-pixel text-4xl leading-none",
+            arrowReady ? "text-ut-act animate-blink" : "text-ut-dim opacity-60",
+          ].join(" ")}
+          aria-hidden="true"
+        >
+          ▼
+        </span>
+      )}
+    </Wrapper>
   );
-}
+});
 
 function MenuPanel({
   mission,

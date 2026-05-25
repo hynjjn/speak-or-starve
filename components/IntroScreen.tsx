@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Typewriter from "./Typewriter";
+import { useEffect, useRef, useState } from "react";
+import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { useGame } from "@/lib/game-state";
 
 const LINES = [
@@ -16,9 +16,13 @@ export default function IntroScreen() {
   const { goto } = useGame();
   const [idx, setIdx] = useState(0);
   const [lineDone, setLineDone] = useState(false);
+  const tw = useRef<TypewriterHandle>(null);
 
-  const advance = () => {
-    if (!lineDone) return;
+  const handleAdvance = () => {
+    if (!lineDone) {
+      tw.current?.complete();
+      return;
+    }
     if (idx < LINES.length - 1) {
       setIdx((i) => i + 1);
       setLineDone(false);
@@ -30,7 +34,7 @@ export default function IntroScreen() {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " " || e.key === "z" || e.key === "Z") {
-        advance();
+        handleAdvance();
       }
     };
     window.addEventListener("keydown", onKey);
@@ -43,22 +47,32 @@ export default function IntroScreen() {
         <div className="text-[140px] font-pixel text-ut-dust select-none">{"~"}</div>
       </div>
 
-      <div className="relative w-full ut-box p-6 min-h-[140px] flex items-center">
+      <button
+        type="button"
+        onClick={handleAdvance}
+        aria-label={lineDone ? "Continue" : "Skip to end of line"}
+        className="relative w-full ut-box p-6 min-h-[140px] flex items-center text-left cursor-pointer hover:border-ut-act focus:outline-none focus:border-ut-act transition-colors"
+      >
         <Typewriter
+          ref={tw}
           key={idx}
           text={LINES[idx]}
           className="ut-dialog"
           onDone={() => setLineDone(true)}
         />
-        {lineDone && (
-          <span className="absolute bottom-2 right-3 ut-pixel-text text-ut-dim animate-blink">
-            ▼
-          </span>
-        )}
-      </div>
+        <span
+          className={[
+            "absolute bottom-2 right-4 font-pixel text-4xl leading-none",
+            lineDone ? "text-ut-act animate-blink" : "text-ut-dim opacity-60",
+          ].join(" ")}
+          aria-hidden="true"
+        >
+          ▼
+        </span>
+      </button>
 
       <p className="ut-pixel-text text-ut-dim mt-3 opacity-70">
-        [Z / ENTER] CONTINUE
+        [Z / ENTER / CLICK] CONTINUE · CLICK WHILE TYPING TO SKIP
       </p>
     </div>
   );
