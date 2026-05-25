@@ -640,6 +640,15 @@ function SpeakPanel({
     referenceWordCount,
   ]);
 
+  // Auto-start the mic when the panel mounts so the player doesn't have to
+  // click SPEAK first. Guarded against StrictMode double-mount.
+  const didAutoStartRef = useRef(false);
+  useEffect(() => {
+    if (didAutoStartRef.current) return;
+    didAutoStartRef.current = true;
+    handleStart();
+  }, [handleStart]);
+
   // ESC cancels (only when not actively listening)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
