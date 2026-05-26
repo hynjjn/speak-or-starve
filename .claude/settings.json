@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ fetch origin main)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ rev-parse main)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ rev-parse origin/main)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ checkout main)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ merge --ff-only feat/background-integration)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ push origin main)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ checkout -b feat/debug-mode)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ add lib/debug.ts components/Encounter.tsx .env.local.example)",
+      "Bash(git -C /Users/hj/dev/speak-or-starve/ commit -m ' *)"
+    ]
+  }
+}
