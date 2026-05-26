@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import HUD from "./HUD";
 import { useGame } from "@/lib/game-state";
 import { STAGES } from "@/lib/stages";
 
@@ -63,8 +62,6 @@ export default function Overworld() {
 
   return (
     <div className="absolute inset-0 flex flex-col">
-      <HUD />
-
       <div className="relative flex-1 overflow-hidden bg-ut-ocean">
         {/* ocean tile pattern */}
         <div

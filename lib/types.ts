@@ -45,6 +45,8 @@ export type Stage = {
 
 export type EndingKind = "perfect" | "barely" | "chief" | "gameover";
 
+export type CharacterId = "default" | "girl";
+
 export type GameState = {
   scene: Scene;
   hp: number;
@@ -53,4 +55,6 @@ export type GameState = {
   clearedStages: number[];
   inventory: ItemId[];
   endingKind: EndingKind | null;
+  playerName: string;
+  character: CharacterId;
 };

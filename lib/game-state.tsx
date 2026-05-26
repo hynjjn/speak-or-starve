@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { STAGES } from "./stages";
-import type { EndingKind, GameState, ItemId, Scene } from "./types";
+import type { CharacterId, EndingKind, GameState, ItemId, Scene } from "./types";
 
 type Action =
   | { type: "RESET" }
@@ -18,7 +18,9 @@ type Action =
   | { type: "DAMAGE"; amount: number }
   | { type: "HEAL"; amount: number }
   | { type: "CLEAR_STAGE"; stageId: number; rewards: ItemId[] }
-  | { type: "FORCE_END"; kind: EndingKind };
+  | { type: "FORCE_END"; kind: EndingKind }
+  | { type: "SET_NAME"; name: string }
+  | { type: "SET_CHARACTER"; character: CharacterId };
 
 const INITIAL: GameState = {
   scene: "title",
@@ -28,6 +30,8 @@ const INITIAL: GameState = {
   clearedStages: [],
   inventory: [],
   endingKind: null,
+  playerName: "",
+  character: "default",
 };
 
 function endingFor(hp: number, items: number, total: number): EndingKind {
@@ -86,6 +90,10 @@ function reducer(state: GameState, action: Action): GameState {
         scene: action.kind === "gameover" ? "gameover" : "ending",
         endingKind: action.kind,
       };
+    case "SET_NAME":
+      return { ...state, playerName: action.name.slice(0, 12) };
+    case "SET_CHARACTER":
+      return { ...state, character: action.character };
     default:
       return state;
   }
@@ -99,6 +107,8 @@ type Ctx = {
   damage: (amount: number) => void;
   heal: (amount: number) => void;
   clearStage: (stageId: number, rewards: ItemId[]) => void;
+  setPlayerName: (name: string) => void;
+  setCharacter: (character: CharacterId) => void;
 };
 
 const GameCtx = createContext<Ctx | null>(null);
@@ -116,6 +126,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
       heal: (amount) => dispatch({ type: "HEAL", amount }),
       clearStage: (stageId, rewards) =>
         dispatch({ type: "CLEAR_STAGE", stageId, rewards }),
+      setPlayerName: (name) => dispatch({ type: "SET_NAME", name }),
+      setCharacter: (character) => dispatch({ type: "SET_CHARACTER", character }),
     }),
     [state],
   );

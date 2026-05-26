@@ -1,7 +1,6 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import HUD from "./HUD";
 import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { useGame } from "@/lib/game-state";
 import { ITEMS, STAGES } from "@/lib/stages";
@@ -188,8 +187,6 @@ export default function Encounter() {
 
   return (
     <div className={["absolute inset-0 flex flex-col", shake && "animate-shake"].filter(Boolean).join(" ")}>
-      <HUD />
-
       {/* Enemy / scene panel */}
       <div className="relative flex-1 flex flex-col items-center justify-center bg-ut-dust">
         <BiomeArt biome={stage.biome} />

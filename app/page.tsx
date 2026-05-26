@@ -7,25 +7,41 @@ import Overworld from "@/components/Overworld";
 import Encounter from "@/components/Encounter";
 import EndingScreen from "@/components/EndingScreen";
 import GameOverScreen from "@/components/GameOverScreen";
+import CharacterPane from "@/components/CharacterPane";
 
 function GameRouter() {
   const { state } = useGame();
-  switch (state.scene) {
-    case "title":
-      return <TitleScreen />;
-    case "intro":
-      return <IntroScreen />;
-    case "overworld":
-      return <Overworld />;
-    case "encounter":
-      return <Encounter />;
-    case "ending":
-      return <EndingScreen />;
-    case "gameover":
-      return <GameOverScreen />;
-    default:
-      return <TitleScreen />;
-  }
+
+  const sceneNode = (() => {
+    switch (state.scene) {
+      case "title":
+        return <TitleScreen />;
+      case "intro":
+        return <IntroScreen />;
+      case "overworld":
+        return <Overworld />;
+      case "encounter":
+        return <Encounter />;
+      case "ending":
+        return <EndingScreen />;
+      case "gameover":
+        return <GameOverScreen />;
+      default:
+        return <TitleScreen />;
+    }
+  })();
+
+  const withPane =
+    state.scene === "overworld" || state.scene === "encounter";
+
+  if (!withPane) return sceneNode;
+
+  return (
+    <div className="absolute inset-0 flex">
+      <CharacterPane />
+      <div className="relative flex-1">{sceneNode}</div>
+    </div>
+  );
 }
 
 export default function Page() {
