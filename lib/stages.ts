@@ -1,4 +1,11 @@
-import type { Item, Stage } from "./types";
+import type { CharacterId, Item, Stage } from "./types";
+
+export const CHARACTERS: Record<CharacterId, { sprite: string }> = {
+  default: { sprite: "/sprites/main_character.png" },
+  girl: { sprite: "/sprites/main_character_girl.png" },
+};
+
+export const CHARACTER_ORDER: CharacterId[] = ["default", "girl"];
 
 export const ITEMS: Record<string, Item> = {
   purification_tablet: {
