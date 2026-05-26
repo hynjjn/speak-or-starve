@@ -2,6 +2,7 @@
 
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Typewriter, { type TypewriterHandle } from "./Typewriter";
+import { DEBUG } from "@/lib/debug";
 import { useGame } from "@/lib/game-state";
 import { ITEMS, STAGES } from "@/lib/stages";
 import {
@@ -437,6 +438,18 @@ function SpeakPanel({
     return count;
   }, []);
 
+  const handleSkip = useCallback(() => {
+    // Block the unmount-driven finalize from also firing onResult.
+    finalizedRef.current = true;
+    clearSilenceTimer();
+    onResult({
+      score: 1,
+      passed: true,
+      message: "* (debug) skipped.",
+      transcript: "",
+    });
+  }, [clearSilenceTimer, onResult]);
+
   const handleStop = useCallback(() => {
     const reco = recognizerRef.current;
     if (!reco) return;
@@ -720,6 +733,16 @@ function SpeakPanel({
           {listening ? "SILENCE ENDS THE TAKE" : "[ESC] BACK"}
         </p>
         <div className="flex gap-2">
+          {DEBUG && (
+            <button
+              type="button"
+              className="ut-btn border-ut-item text-ut-item hover:bg-ut-item hover:text-black"
+              onClick={handleSkip}
+              title="Debug mode: pass without speaking"
+            >
+              ⏭ SKIP
+            </button>
+          )}
           {!listening && !busy && (
             <>
               <button
