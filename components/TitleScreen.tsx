@@ -50,7 +50,7 @@ export default function TitleScreen() {
 
       {/* Character selection */}
       <div className="flex flex-col items-center gap-2">
-        <p className="ut-label text-ut-dim">CHOOSE YOUR CASTAWAY</p>
+        <p className="ut-label text-ut-dim">CHOOSE YOUR CHARACTER</p>
         <div className="flex gap-4">
           {CHARACTER_ORDER.map((id) => {
             const selected = state.character === id;
@@ -94,7 +94,7 @@ export default function TitleScreen() {
       {/* Name input */}
       <div className="flex flex-col items-center gap-1">
         <label htmlFor="player-name" className="ut-label text-ut-dim">
-          NAME THE CASTAWAY
+          NAME THE CHARACTER
         </label>
         <input
           id="player-name"
@@ -108,7 +108,7 @@ export default function TitleScreen() {
               begin();
             }
           }}
-          placeholder="CASTAWAY"
+          placeholder="CHARACTER"
           className="font-pixel text-[12px] tracking-[0.2em] uppercase text-center
                      bg-black text-white border-2 border-white px-3 py-2 w-56
                      focus:outline-none focus:border-ut-act focus:text-ut-act"

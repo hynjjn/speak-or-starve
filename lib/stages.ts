@@ -38,7 +38,7 @@ export const STAGES: Stage[] = [
   {
     id: 1,
     slug: "awakening",
-    title: "STAGE 1 — WAKE UP",
+    title: "STAGE 1 — SURVIVE",
     subtitle: "You open your eyes on the sand.",
     watchLine:
       "* SmartWatch: Vitals critical. Speak to confirm consciousness. Water and shelter required.",
@@ -125,7 +125,7 @@ export const STAGES: Stage[] = [
   {
     id: 4,
     slug: "horizon",
-    title: "STAGE 4 — GO HOME",
+    title: "STAGE 4 — ESCAPE",
     subtitle: "A ship cuts the horizon. Maybe the last one.",
     watchLine:
       "* SmartWatch: Vessel detected at 2 o'clock. Last flare on standby. Speak loud.",

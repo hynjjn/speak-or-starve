@@ -7,7 +7,7 @@ import EscapeTimer from "./EscapeTimer";
 
 export default function CharacterPane() {
   const { state } = useGame();
-  const name = state.playerName || "CASTAWAY";
+  const name = state.playerName || "CHARACTER";
   const pct = Math.max(0, Math.min(100, (state.hp / state.maxHp) * 100));
   const sprite = CHARACTERS[state.character].sprite;
 

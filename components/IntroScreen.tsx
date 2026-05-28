@@ -76,10 +76,10 @@ export default function IntroScreen() {
           ▼
         </span>
       </button>
-
+{/* 
       <p className="relative ut-pixel-text text-ut-dim mt-3 opacity-70">
         [Z / ENTER / CLICK] CONTINUE · CLICK WHILE TYPING TO SKIP
-      </p>
+      </p> */}
     </div>
   );
 }
