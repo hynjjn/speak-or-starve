@@ -11,6 +11,8 @@ import {
 import { STAGES } from "./stages";
 import type { CharacterId, EndingKind, GameState, ItemId, Scene } from "./types";
 
+export const ESCAPE_TIME_MS = 10 * 60 * 1000;
+
 type Action =
   | { type: "RESET" }
   | { type: "GOTO"; scene: Scene }
@@ -32,6 +34,7 @@ const INITIAL: GameState = {
   endingKind: null,
   playerName: "",
   character: "default",
+  escapeStartedAt: null,
 };
 
 function endingFor(hp: number, items: number, total: number): EndingKind {
@@ -47,8 +50,16 @@ function reducer(state: GameState, action: Action): GameState {
       return { ...INITIAL };
     case "GOTO":
       return { ...state, scene: action.scene };
-    case "ENTER_STAGE":
-      return { ...state, scene: "encounter", currentStageId: action.stageId };
+    case "ENTER_STAGE": {
+      const startTimer =
+        state.escapeStartedAt == null && action.stageId === STAGES[0].id;
+      return {
+        ...state,
+        scene: "encounter",
+        currentStageId: action.stageId,
+        escapeStartedAt: startTimer ? Date.now() : state.escapeStartedAt,
+      };
+    }
     case "DAMAGE": {
       const hp = Math.max(0, state.hp - action.amount);
       if (hp <= 0) {
@@ -107,6 +118,7 @@ type Ctx = {
   damage: (amount: number) => void;
   heal: (amount: number) => void;
   clearStage: (stageId: number, rewards: ItemId[]) => void;
+  forceEnd: (kind: EndingKind) => void;
   setPlayerName: (name: string) => void;
   setCharacter: (character: CharacterId) => void;
 };
@@ -126,6 +138,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       heal: (amount) => dispatch({ type: "HEAL", amount }),
       clearStage: (stageId, rewards) =>
         dispatch({ type: "CLEAR_STAGE", stageId, rewards }),
+      forceEnd: (kind) => dispatch({ type: "FORCE_END", kind }),
       setPlayerName: (name) => dispatch({ type: "SET_NAME", name }),
       setCharacter: (character) => dispatch({ type: "SET_CHARACTER", character }),
     }),

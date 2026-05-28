@@ -1,8 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { CHARACTERS, STAGES } from "@/lib/stages";
+import { CHARACTERS, ITEMS, STAGES } from "@/lib/stages";
 import { useGame } from "@/lib/game-state";
+import EscapeTimer from "./EscapeTimer";
 
 export default function CharacterPane() {
   const { state } = useGame();
@@ -14,11 +15,11 @@ export default function CharacterPane() {
     <aside className="flex flex-col w-[200px] shrink-0 bg-black border-r-4 border-white">
       {/* Name header */}
       <div className="px-3 py-3 border-b-2 border-white text-center">
-        <p className="ut-label text-ut-dim mb-1">CASTAWAY</p>
+        <p className="ut-label text-ut-dim mb-1">SPEAK OR STARVE</p>
         <p className="font-pixel text-[14px] tracking-[0.18em] text-white truncate">
           {name}
         </p>
-        <p className="ut-pixel-text text-ut-dim mt-1">LV 1</p>
+        {/* <p className="ut-pixel-text text-ut-dim mt-1">LV 1</p> */}
       </div>
 
       {/* Full character image */}
@@ -50,25 +51,37 @@ export default function CharacterPane() {
         </div>
       </div>
 
-      {/* Stage badges */}
+      {/* Escape timer */}
+      <EscapeTimer />
+
+      {/* Item badges */}
       <div className="px-3 py-3">
         <p className="ut-label text-ut-dim mb-2 text-center">ITEMS</p>
         <div className="grid grid-cols-4 gap-1">
           {STAGES.map((s) => {
-            const cleared = state.clearedStages.includes(s.id);
+            const item = ITEMS[s.reward[0]];
+            const acquired = state.clearedStages.includes(s.id);
             return (
-              <span
+              <div
                 key={s.id}
-                title={`Stage ${s.id} — ${cleared ? "cleared" : "locked"}`}
+                title={`${item.name} — ${acquired ? "acquired" : "locked"}`}
                 className={[
-                  "aspect-square flex items-center justify-center font-pixel text-[10px] border-2",
-                  cleared
-                    ? "border-ut-hp text-black bg-ut-hp"
-                    : "border-ut-dim text-ut-dim bg-ut-dust",
+                  "relative aspect-square border-2 bg-ut-dust",
+                  acquired ? "border-ut-hp" : "border-ut-dim",
                 ].join(" ")}
               >
-                {s.id}
-              </span>
+                <Image
+                  src={item.sprite}
+                  alt={item.name}
+                  fill
+                  sizes="44px"
+                  className="object-contain p-0.5"
+                  style={{
+                    filter: acquired ? "none" : "grayscale(100%)",
+                    opacity: acquired ? 1 : 0.4,
+                  }}
+                />
+              </div>
             );
           })}
         </div>

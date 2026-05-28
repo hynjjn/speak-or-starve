@@ -7,18 +7,12 @@ export type Scene =
   | "ending"
   | "gameover";
 
-export type ItemId =
-  | "purification_tablet"
-  | "tarp"
-  | "fire_steel"
-  | "fishing_rod"
-  | "first_aid_kit"
-  | "signal_flare";
+export type ItemId = "fish" | "knife" | "clothes" | "boat";
 
 export type Item = {
   id: ItemId;
   name: string;
-  icon: string;
+  sprite: string;
   blurb: string;
 };
 
@@ -57,4 +51,5 @@ export type GameState = {
   endingKind: EndingKind | null;
   playerName: string;
   character: CharacterId;
+  escapeStartedAt: number | null;
 };
