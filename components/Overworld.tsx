@@ -192,7 +192,7 @@ export default function Overworld() {
 
       <div className="bg-black border-t-4 border-white px-4 py-2 flex items-center justify-between">
         <p className="ut-pixel-text text-ut-dim">
-          MOVE: ARROWS / WASD &nbsp; · &nbsp; ENTER STAGE: Z / ENTER / CLICK NODE
+          {/* MOVE: ARROWS / WASD &nbsp; · &nbsp; ENTER STAGE: Z / ENTER / CLICK NODE */}
         </p>
         <p className="ut-pixel-text text-ut-act">
           {state.clearedStages.length}/{STAGES.length} CLEARED

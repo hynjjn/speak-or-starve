@@ -1,6 +1,7 @@
 "use client";
 
 import { forwardRef, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { DEBUG } from "@/lib/debug";
 import { useGame } from "@/lib/game-state";
@@ -14,13 +15,9 @@ import {
 
 type Phase =
   | "intro" // watch + inner voice
-  | "menu" // soul navigates FIGHT/ACT/ITEM/MERCY
   | "speak" // speaking mission active (mic open)
   | "result" // grade returned
   | "victory";
-
-const MENU = ["SPEAK", "ACT", "ITEM", "MERCY"] as const;
-type MenuOpt = (typeof MENU)[number];
 
 export default function Encounter() {
   const { state, damage, clearStage, goto } = useGame();
@@ -29,7 +26,6 @@ export default function Encounter() {
   const [phase, setPhase] = useState<Phase>("intro");
   const [introIdx, setIntroIdx] = useState(0);
   const [introDone, setIntroDone] = useState(false);
-  const [menuIdx, setMenuIdx] = useState(0);
   const [missionIdx, setMissionIdx] = useState(0);
   const [grade, setGrade] = useState<GradeResult | null>(null);
   const [shake, setShake] = useState(false);
@@ -53,7 +49,7 @@ export default function Encounter() {
       setIntroIdx((i) => i + 1);
       setIntroDone(false);
     } else {
-      setPhase("menu");
+      setPhase("speak");
     }
   }
 
@@ -69,58 +65,7 @@ export default function Encounter() {
     return () => window.removeEventListener("keydown", onKey);
   });
 
-  // Menu keyboard handler
-  useEffect(() => {
-    if (phase !== "menu") return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft" || e.key === "a")
-        setMenuIdx((i) => (i + MENU.length - 1) % MENU.length);
-      if (e.key === "ArrowRight" || e.key === "d")
-        setMenuIdx((i) => (i + 1) % MENU.length);
-      if (e.key === "Enter" || e.key === "z" || e.key === "Z" || e.key === " ") {
-        choose(MENU[menuIdx]);
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  });
-
   if (!stage) return null;
-
-  function choose(opt: MenuOpt) {
-    if (opt === "SPEAK") setPhase("speak");
-    if (opt === "ACT") {
-      // peek the hint as a free action
-      setGrade({
-        score: 0,
-        passed: false,
-        message: `* (hint) ${stage!.missions[missionIdx].hint}`,
-      });
-      setPhase("result");
-    }
-    if (opt === "ITEM") {
-      setGrade({
-        score: 0,
-        passed: false,
-        message: state.inventory.length
-          ? `* You rummage. ${ITEMS[state.inventory[0]].blurb}`
-          : "* Your bag is empty. The sea sloshes inside your ribs.",
-      });
-      setPhase("result");
-    }
-    if (opt === "MERCY") {
-      // forfeit the stage — costs HP, no reward
-      setShake(true);
-      damage(stage!.damageOnFail);
-      setGrade({
-        score: 0,
-        passed: false,
-        message: "* You give up speaking. The wind takes a bite of you.",
-      });
-      setTimeout(() => setShake(false), 400);
-      setPhase("result");
-    }
-  }
 
   const handleSpeakResult = useCallback(
     (result: GradeResult) => {
@@ -146,11 +91,11 @@ export default function Encounter() {
         setPhase("victory");
       } else {
         setMissionIdx((i) => i + 1);
-        setPhase("menu");
+        setPhase("speak");
       }
     } else {
-      // back to menu on fail (HP already deducted)
-      setPhase("menu");
+      // retry the same mission on fail (HP already deducted)
+      setPhase("speak");
     }
   }
 
@@ -193,7 +138,7 @@ export default function Encounter() {
         <BiomeArt biome={stage.biome} />
 
         <div className="relative z-10 text-center">
-          <div className="ut-label text-ut-soul mb-2">! ENCOUNTER</div>
+          <div className="ut-label text-ut-soul mb-2">SPEAK OR STARVE</div>
           <h2 className="font-pixel text-2xl tracking-widest">{stage.title}</h2>
           <p className="ut-pixel-text text-ut-dim mt-2 max-w-sm mx-auto">
             {stage.subtitle}
@@ -220,24 +165,11 @@ export default function Encounter() {
           />
         )}
 
-        {phase === "menu" && (
-          <MenuPanel
-            mission={mission!}
-            menuIdx={menuIdx}
-            onPick={(i) => {
-              setMenuIdx(i);
-              choose(MENU[i]);
-            }}
-            missionIdx={missionIdx}
-            total={stage.missions.length}
-          />
-        )}
-
         {phase === "speak" && (
           <SpeakPanel
             mission={mission!}
             onResult={handleSpeakResult}
-            onCancel={() => setPhase("menu")}
+            onCancel={() => goto("overworld")}
           />
         )}
 
@@ -256,13 +188,22 @@ export default function Encounter() {
         )}
 
         {phase === "victory" && (
-          <div className="text-center space-y-3">
-            <p className="ut-dialog text-ut-act">
-              * You earned: {stage.reward.map((r) => ITEMS[r].name).join(" + ")}
-            </p>
-            <p className="ut-pixel-text text-ut-dim">
-              {stage.reward.map((r) => ITEMS[r].blurb).join(" / ")}
-            </p>
+          <div className="flex flex-col items-center gap-3 text-center">
+            {stage.reward.map((r) => (
+              <div key={r} className="flex flex-col items-center gap-2">
+                <div className="relative w-24 h-24 border-2 border-ut-hp bg-ut-dust animate-bob">
+                  <Image
+                    src={ITEMS[r].sprite}
+                    alt={ITEMS[r].name}
+                    fill
+                    sizes="96px"
+                    className="object-contain p-1.5"
+                  />
+                </div>
+                <p className="ut-dialog text-ut-act">* {ITEMS[r].name} acquired</p>
+                <p className="ut-pixel-text text-ut-dim">{ITEMS[r].blurb}</p>
+              </div>
+            ))}
             <button className="ut-btn ut-btn-active animate-blink" onClick={() => clearStage(stage.id, stage.reward)}>
               ▶ PRESS [Z] TO LEAVE
             </button>
@@ -275,7 +216,7 @@ export default function Encounter() {
         onClick={() => goto("overworld")}
         className="absolute top-2 right-2 ut-pixel-text text-ut-dim hover:text-white"
       >
-        [ESC] ABANDON
+        [ESC] TO GO BACK
       </button>
     </div>
   );
@@ -326,64 +267,6 @@ const DialogPanel = forwardRef<
     </Wrapper>
   );
 });
-
-function MenuPanel({
-  mission,
-  menuIdx,
-  onPick,
-  missionIdx,
-  total,
-}: {
-  mission: { prompt: string; hint: string; target: string };
-  menuIdx: number;
-  onPick: (i: number) => void;
-  missionIdx: number;
-  total: number;
-}) {
-  return (
-    <div className="flex flex-col gap-3">
-      <div className="flex items-start gap-3">
-        <div className="soul mt-1" />
-        <div>
-          <p className="ut-dialog">{mission.prompt}</p>
-          <p className="ut-pixel-text text-ut-dim mt-1">
-            MISSION {missionIdx + 1} / {total} · CHOOSE AN ACTION
-          </p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-4 gap-2 mt-1">
-        {MENU.map((label, i) => (
-          <button
-            key={label}
-            onClick={() => onPick(i)}
-            className={[
-              "ut-btn relative",
-              i === menuIdx && "ut-btn-active",
-              label === "SPEAK" && "border-ut-fight text-ut-fight",
-              label === "ACT" && "border-ut-act text-ut-act",
-              label === "ITEM" && "border-ut-item text-ut-item",
-              label === "MERCY" && "border-ut-mercy text-ut-mercy",
-              i === menuIdx && "bg-white !text-black",
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            {i === menuIdx && (
-              <span className="absolute -left-3 top-1/2 -translate-y-1/2">
-                <span className="soul" />
-              </span>
-            )}
-            {label}
-          </button>
-        ))}
-      </div>
-      <p className="ut-pixel-text text-ut-dim">
-        ◀ ▶ MOVE · [Z / ENTER] SELECT
-      </p>
-    </div>
-  );
-}
 
 const SILENCE_MS = 4000;
 

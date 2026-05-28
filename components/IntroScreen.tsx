@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import Typewriter, { type TypewriterHandle } from "./Typewriter";
 import { useGame } from "@/lib/game-state";
 
 const LINES = [
-  "* The plane spun. Then nothing.",
-  "* You wake up on sand the color of bone.",
-  "* Your smartwatch flickers. It is the last voice you have.",
-  "* WATCH: To survive, you must SPEAK. I will hear you.",
-  "* WATCH: Stay silent — and the island keeps you.",
+  "* The plane fell down. And BOOM!",
+  "* You wake up on the mystery island!",
+  "* To survive, you must speak.",
+  "* YOU HAVE ONLY 10 MINUTES TO GO HOME!",
 ];
 
 export default function IntroScreen() {
@@ -43,9 +43,15 @@ export default function IntroScreen() {
 
   return (
     <div className="absolute inset-0 flex flex-col items-center justify-end p-8">
-      <div className="absolute inset-0 flex items-center justify-center">
-        <div className="text-[140px] font-pixel text-ut-dust select-none">{"~"}</div>
-      </div>
+      <Image
+        src="/sprites/intro.jpeg"
+        alt="A plane crash on a mystery island"
+        fill
+        sizes="960px"
+        priority
+        className="object-cover select-none"
+      />
+      <div className="absolute inset-0 bg-black/40" />
 
       <button
         type="button"
@@ -71,7 +77,7 @@ export default function IntroScreen() {
         </span>
       </button>
 
-      <p className="ut-pixel-text text-ut-dim mt-3 opacity-70">
+      <p className="relative ut-pixel-text text-ut-dim mt-3 opacity-70">
         [Z / ENTER / CLICK] CONTINUE · CLICK WHILE TYPING TO SKIP
       </p>
     </div>

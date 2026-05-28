@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { useGame } from "@/lib/game-state";
 import { ITEMS } from "@/lib/stages";
 
@@ -74,10 +75,16 @@ export default function EndingScreen() {
           {state.inventory.map((id) => (
             <span
               key={id}
-              className="ut-pixel-text text-ut-act border border-white px-1"
+              className="relative block w-7 h-7 border border-white bg-ut-dust"
               title={ITEMS[id].name}
             >
-              {ITEMS[id].icon}
+              <Image
+                src={ITEMS[id].sprite}
+                alt={ITEMS[id].name}
+                fill
+                sizes="28px"
+                className="object-contain p-0.5"
+              />
             </span>
           ))}
         </div>
