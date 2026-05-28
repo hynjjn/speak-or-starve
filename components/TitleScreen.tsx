@@ -116,7 +116,7 @@ export default function TitleScreen() {
       </div>
 
       <button onClick={begin} className="ut-btn animate-blink">
-        ▶ PRESS ENTER TO BEGIN
+        ▶ ENTER TO BEGIN
       </button>
 
       <p className="absolute bottom-4 right-4 ut-pixel-text text-ut-dim opacity-60">

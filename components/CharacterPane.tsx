@@ -1,15 +1,9 @@
 "use client";
 
 import Image from "next/image";
-import { CHARACTERS } from "@/lib/stages";
+import { CHARACTERS, ITEMS, STAGES } from "@/lib/stages";
 import { useGame } from "@/lib/game-state";
-
-const STAGE_ITEMS: { stageId: number; src: string; name: string }[] = [
-  { stageId: 1, src: "/sprites/fish.png", name: "FISH" },
-  { stageId: 2, src: "/sprites/knife.png", name: "KNIFE" },
-  { stageId: 3, src: "/sprites/clothes.png", name: "CLOTHES" },
-  { stageId: 4, src: "/sprites/boat.png", name: "BOAT" },
-];
+import EscapeTimer from "./EscapeTimer";
 
 export default function CharacterPane() {
   const { state } = useGame();
@@ -21,11 +15,11 @@ export default function CharacterPane() {
     <aside className="flex flex-col w-[200px] shrink-0 bg-black border-r-4 border-white">
       {/* Name header */}
       <div className="px-3 py-3 border-b-2 border-white text-center">
-        <p className="ut-label text-ut-dim mb-1">CASTAWAY</p>
+        <p className="ut-label text-ut-dim mb-1">SPEAK OR STARVE</p>
         <p className="font-pixel text-[14px] tracking-[0.18em] text-white truncate">
           {name}
         </p>
-        <p className="ut-pixel-text text-ut-dim mt-1">LV 1</p>
+        {/* <p className="ut-pixel-text text-ut-dim mt-1">LV 1</p> */}
       </div>
 
       {/* Full character image */}
@@ -57,15 +51,19 @@ export default function CharacterPane() {
         </div>
       </div>
 
+      {/* Escape timer */}
+      <EscapeTimer />
+
       {/* Item badges */}
       <div className="px-3 py-3">
         <p className="ut-label text-ut-dim mb-2 text-center">ITEMS</p>
         <div className="grid grid-cols-4 gap-1">
-          {STAGE_ITEMS.map((item) => {
-            const acquired = state.clearedStages.includes(item.stageId);
+          {STAGES.map((s) => {
+            const item = ITEMS[s.reward[0]];
+            const acquired = state.clearedStages.includes(s.id);
             return (
               <div
-                key={item.stageId}
+                key={s.id}
                 title={`${item.name} — ${acquired ? "acquired" : "locked"}`}
                 className={[
                   "relative aspect-square border-2 bg-ut-dust",
@@ -73,13 +71,12 @@ export default function CharacterPane() {
                 ].join(" ")}
               >
                 <Image
-                  src={item.src}
+                  src={item.sprite}
                   alt={item.name}
                   fill
                   sizes="44px"
                   className="object-contain p-0.5"
                   style={{
-                    imageRendering: "pixelated",
                     filter: acquired ? "none" : "grayscale(100%)",
                     opacity: acquired ? 1 : 0.4,
                   }}
